@@ -1,0 +1,8 @@
+rfid_id,employee_name,department,email,role
+999999,Admin User,Administration,admin@example.com,admin
+123456,John Doe,Engineering,john.doe@example.com,user
+345678,Bob Johnson,Sales,bob.johnson@example.com,user
+456789,Alice Williams,Human Resources,alice.williams@example.com,user
+567890,Michael Brown,Finance,michael.brown@example.com,user
+678901,Linda Davis,IT,linda.davis@example.com,user
+123456,James Miller,Operations,james.miller@example.com,user
