@@ -1,3 +1,16 @@
+"""ARCHIVED PROTOTYPE -- not part of the working system.
+
+This was the first attempt at food recognition: open a webcam with OpenCV, run
+every frame through YOLOv5, and draw boxes on screen. It was abandoned in favour
+of the still-photo pipeline in src/food_detector.py, which is what
+src/cafeteria_checkout.py actually calls.
+
+Kept for the write-up only. It does not run as-is: it imports YOLOv5 as an
+installed `yolov5` package (this repo vendors the source at vendor/yolov5
+instead), and it reads `results.xyxy`, which is the torch.hub AutoShape API
+rather than the DetectMultiBackend API it constructs.
+"""
+
 import torch
 from yolov5.models.common import DetectMultiBackend
 from pathlib import Path

@@ -1,41 +1,61 @@
-from utils.general import LOGGER
-from picamera2 import Picamera2
-from datetime import datetime
-from time import sleep
-import datetime
+"""Automated cafeteria checkout -- main entry point.
+
+Runs the full checkout loop on the Raspberry Pi: wait for an RFID scan over the
+network, photograph the tray, run food_detector.py over the photo, price the
+detected items against data/admin/food_items.csv, and append the sale to
+data/admin/transactions.csv.
+
+    python3 src/cafeteria_checkout.py
+"""
+
 import csv
+import datetime
+import os
+import shutil
 import socket
 import subprocess
-import shutil
-import os
+import sys
+from pathlib import Path
+from time import sleep
+
+# Make sibling modules importable when this file is run directly as a script.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import config  # noqa: E402  -- also puts vendor/yolov5 on sys.path for the import below
+
+from picamera2 import Picamera2  # noqa: E402  -- Raspberry Pi only
+from utils.general import LOGGER  # noqa: E402  -- from vendor/yolov5
+
 
 def detection():
-	# LOGGER.info("Cafeteria Checkout")
-	subprocess.run(["python3", "detect.py"], check=True)
-	# LOGGER.info("Program ended")
+    # LOGGER.info("Cafeteria Checkout")
+    subprocess.run([sys.executable, str(config.SRC_DIR / "food_detector.py")], check=True)
+    # LOGGER.info("Program ended")
+
 
 def start_server(host='192.168.88.191', port=12345):
     LOGGER.info("Scan your ID")
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
-    server_socket.listen(1)  
-    
+    server_socket.listen(1)
+
     # print(f"Server listening on {host}:{port}")
-    conn, addr = server_socket.accept()  
+    conn, addr = server_socket.accept()
     # print(f"Connection from {addr}")
-    
-    data = conn.recv(1024) 
+
+    data = conn.recv(1024)
     try:
         data = data.decode('utf-8')
         print(f"User ID: {data}")
     except UnicodeDecodeError:
         LOGGER.error("Failed to decode data")
         data = "unknown_data"
-		
+
     conn.close()  # Close the connection
     server_socket.close()
-	
+
     return data
+
 
 def take_picture(data):
     print("")
@@ -58,13 +78,12 @@ def take_picture(data):
         sleep(3)
         time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_data = "".join([c if c.isalnum() else "_" for c in data]).replace(" ", "")
-        output_dir = "data/images"
-        os.makedirs(output_dir, exist_ok=True)
-        img_name = os.path.join(output_dir, f"transaction_{time}_{safe_data}.jpg")
+        img_name = os.path.join(config.CAPTURE_DIR, f"transaction_{time}_{safe_data}.jpg")
         picam2.capture_file(img_name)
     finally:
         picam2.stop()
     return img_name
+
 
 def remove_img(img_name):
     if os.path.exists(img_name):
@@ -72,34 +91,35 @@ def remove_img(img_name):
         # print("File has been deleted")
     else:
         print("File does not exist")
-    if os.path.exists("exp"):
-        shutil.rmtree("exp")
+    run_dir = config.RUNS_DIR / "exp"
+    if os.path.exists(run_dir):
+        shutil.rmtree(run_dir)
         # print("Folder has been deleted")
     else:
         print("Folder does not exist")
-	
+
+
 def get_items_to_search():
     # print("Get_items_search started")
-    file_path = "detected_foods.csv"
-    with open(file_path, mode='r') as file:
+    with open(config.DETECTED_FOODS_CSV, mode='r') as file:
         # print("Checkpoint 1")
         csv_reader = csv.reader(file)
         items = [row[1] for row in csv_reader]
     # print("Get_items_search done")
     return items
 
+
 def get_item_prices(items_to_search):
     # print("Get_prices started")
-    file_path = "admin_data/food_items.csv"
     item_prices = {}
-    with open(file_path, mode='r') as file:
+    with open(config.FOOD_ITEMS_CSV, mode='r') as file:
         # print("Checkpoint 2")
         csv_reader = csv.reader(file)
-        next(csv_reader)  
+        next(csv_reader)
         for row in csv_reader:
             # print("Checkpoint 3")
-            item_name = row[1]  
-            price = row[2]  
+            item_name = row[1]
+            price = row[2]
             if item_name in items_to_search:
                 # print("Checkpoint 4")
                 item_prices[item_name] = price
@@ -113,11 +133,10 @@ def write_transactions(employee_id, item_prices):
     print("Items purchased:")
     print("--------------------------")
     # print("transactions start")
-    file_path = "admin_data/transactions.csv"
-    with open(file_path, mode='w', newline='') as file:
+    with open(config.TRANSACTIONS_CSV, mode='w', newline='') as file:
         # print("Checkpoint 5")
         csv_writer = csv.writer(file)
-        csv_writer.writerow(["Time", "Employee ID", "Item Name", "Price"]) 
+        csv_writer.writerow(["Time", "Employee ID", "Item Name", "Price"])
         for item, price in item_prices.items():
             print(f"{item} {price}")
             # print("Checkpoint 6")
@@ -126,13 +145,15 @@ def write_transactions(employee_id, item_prices):
     # print("transactions ended")
     print("")
 
-def clear_detected_items() :
-	with open("detected_foods.csv", mode='w', newline='') as file:
-		pass
+
+def clear_detected_items():
+    with open(config.DETECTED_FOODS_CSV, mode='w', newline='') as file:
+        pass
+
 
 def get_employee_info(employee_id):
     # print("get emp data")
-    with open("admin_data/employee_data.csv", mode='r') as file:
+    with open(config.EMPLOYEE_DATA_CSV, mode='r') as file:
         csv_reader = csv.reader(file)
         header = next(csv_reader)
         # print("another check")
@@ -144,8 +165,10 @@ def get_employee_info(employee_id):
                 print(f"Department: {row[2]}")
                 print(f"Email: {row[3]}")
 
+
 def clear_terminal():
     os.system('clear')
+
 
 if __name__ == "__main__":
     clear_terminal()
@@ -159,15 +182,15 @@ if __name__ == "__main__":
         get_employee_info(data)
         img_name = take_picture(data)
         detection()
-        
+
         clear_terminal()
         get_employee_info(data)
-        
+
         items_to_search = get_items_to_search()
         item_prices = get_item_prices(items_to_search)
         print(items_to_search)
         write_transactions(data, item_prices)
-    
+
         clear_detected_items()
         remove_img(img_name)
         print("Thank you for your purchase")

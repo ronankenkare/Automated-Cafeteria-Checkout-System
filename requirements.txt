@@ -1,0 +1,9 @@
+# Automated cafeteria checkout system
+# Usage: pip install -r requirements.txt
+
+# YOLOv5 and its dependencies (torch, opencv, ultralytics, ...)
+-r vendor/yolov5/requirements.txt
+
+# Raspberry Pi camera. Ships with Raspberry Pi OS; pip-installing it on a
+# non-Pi machine will fail, so comment this out when working off-device.
+picamera2
