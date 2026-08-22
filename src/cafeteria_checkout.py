@@ -27,9 +27,14 @@ from picamera2 import Picamera2  # noqa: E402  -- Raspberry Pi only
 from utils.general import LOGGER  # noqa: E402  -- from vendor/yolov5
 
 
-def detection():
+def detection(img_name):
     # LOGGER.info("Cafeteria Checkout")
-    subprocess.run([sys.executable, str(config.SRC_DIR / "food_detector.py")], check=True)
+    # Scope the detector to this one photo. Pointed at the whole capture
+    # directory it would re-bill any image left behind by an earlier tray.
+    subprocess.run(
+        [sys.executable, str(config.SRC_DIR / "food_detector.py"), "--source", str(img_name)],
+        check=True,
+    )
     # LOGGER.info("Program ended")
 
 
@@ -91,9 +96,10 @@ def remove_img(img_name):
         # print("File has been deleted")
     else:
         print("File does not exist")
-    run_dir = config.RUNS_DIR / "exp"
-    if os.path.exists(run_dir):
-        shutil.rmtree(run_dir)
+    # YOLOv5 increments its output directory every run (exp, exp2, exp3, ...),
+    # so clear the whole tree instead of guessing the name this run landed on.
+    if os.path.exists(config.RUNS_DIR):
+        shutil.rmtree(config.RUNS_DIR)
         # print("Folder has been deleted")
     else:
         print("Folder does not exist")
@@ -133,10 +139,14 @@ def write_transactions(employee_id, item_prices):
     print("Items purchased:")
     print("--------------------------")
     # print("transactions start")
-    with open(config.TRANSACTIONS_CSV, mode='w', newline='') as file:
+    # Append -- the ledger has to outlive the transaction. The header is only
+    # written when the file is new or empty.
+    needs_header = not os.path.exists(config.TRANSACTIONS_CSV) or os.path.getsize(config.TRANSACTIONS_CSV) == 0
+    with open(config.TRANSACTIONS_CSV, mode='a', newline='') as file:
         # print("Checkpoint 5")
         csv_writer = csv.writer(file)
-        csv_writer.writerow(["Time", "Employee ID", "Item Name", "Price"])
+        if needs_header:
+            csv_writer.writerow(["Time", "Employee ID", "Item Name", "Price"])
         for item, price in item_prices.items():
             print(f"{item} {price}")
             # print("Checkpoint 6")
@@ -181,7 +191,7 @@ if __name__ == "__main__":
         data = start_server()
         get_employee_info(data)
         img_name = take_picture(data)
-        detection()
+        detection(img_name)
 
         clear_terminal()
         get_employee_info(data)

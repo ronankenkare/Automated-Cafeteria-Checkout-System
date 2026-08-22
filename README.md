@@ -18,14 +18,13 @@ time:
    `data/admin/employee_data.csv`.
 2. **Capture** — counts down, takes a photo of the tray with the Pi camera, and
    writes it to `data/captures/`.
-3. **Detect** — shells out to `src/food_detector.py`, which runs YOLOv5 over the
-   capture directory and appends every food it recognizes to
-   `data/detected_foods.csv`. Annotated copies of the photos land in
-   `results/runs/`.
-4. **Charge** — prices those items against `data/admin/food_items.csv` and writes
+3. **Detect** — shells out to `src/food_detector.py` with that one photo as its
+   source, and it appends every food it recognizes to `data/detected_foods.csv`.
+   An annotated copy of the photo lands in `results/runs/`.
+4. **Charge** — prices those items against `data/admin/food_items.csv` and appends
    the sale to `data/admin/transactions.csv`.
-5. **Reset** — clears the detection list, deletes the tray photo, and waits for
-   the next employee.
+5. **Reset** — clears the detection list, deletes the tray photo and the run
+   output, and waits for the next employee.
 
 Food recognition uses stock YOLOv5s against the COCO classes; the ten COCO labels
 treated as cafeteria items are listed in `FOOD_ITEMS` at the top of
@@ -78,15 +77,6 @@ python3 src/food_detector.py --source results/captures
 
 ## Known issues
 
-- **`write_transactions` opens the ledger with mode `'w'`.** Each purchase
-  overwrites `data/admin/transactions.csv` instead of appending, so only the most
-  recent transaction survives. Should be `'a'`, with the header written only when
-  the file is new.
-- **Run directories accumulate.** YOLOv5 increments its output directory (`exp`,
-  `exp2`, `exp3`, ...), but the cleanup step only ever deletes `exp`, which is why
-  `results/detections/` holds exp3 through exp5.
-- **The detector scans the whole capture directory.** If a previous photo is left
-  in `data/captures/`, its food is billed to the next employee too.
 - **The RFID reader's client code is not in this repo** — only the Pi-side server
   that receives the scan.
 - The reader's IP is hardcoded as a default argument in `start_server`.
